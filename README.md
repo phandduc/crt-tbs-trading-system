@@ -18,7 +18,8 @@ Quy tắc, tiêu chí và sổ chạy: **[RULES.md](RULES.md)** — đọc trư�
 | File | Vai trò |
 |---|---|
 | `crt_tbs.py` | Chiến lược: dựng nến D từ H1, key level, quét TBS / Model #1 → tín hiệu (dùng chung backtest + bot) |
-| `backtest.py` | Backtest trên CSV của repo cũ (kiểm sha256), mô phỏng M1, thống kê + tiêu chí + bảng balance năm / tháng |
+| `backtest.py` | Backtest trên CSV của repo cũ (kiểm sha256), mô phỏng M1, thống kê + tiêu chí + bảng balance năm / tháng. `--risk-percent` / `--account` chỉ đổi bảng USD (rủi ro cố định theo vốn ban đầu, không tái đầu tư); số liệu theo R không đổi |
+| `run_backtest.bat` | Menu chạy backtest: chọn mã, % rủi ro, vốn |
 | `bot.py` | Bot live MT5, một tiến trình cho mọi mã; Telegram |
 | `test_crt_tbs.py` | Test chiến lược / mô phỏng; `--leak` chống nhìn trước tương lai; `--window` cửa sổ nến live |
 | `test_bot.py` | Smoke test bot với MT5 giả |
@@ -28,7 +29,9 @@ Quy tắc, tiêu chí và sổ chạy: **[RULES.md](RULES.md)** — đọc trư�
 
 ```
 pip install MetaTrader5 pandas numpy
-python backtest.py                    # 5 mã, ~40 giây
+python backtest.py                    # 5 mã, ~40 giây, vốn 10 000 USD, rủi ro 1% / lệnh
+python backtest.py --symbols XAUUSD --risk-percent 2 --account 5000
+run_backtest.bat                      # bấm đúp: hỏi mã, % rủi ro, vốn
 python test_crt_tbs.py --leak --window
 python test_bot.py
 copy .env.example .env                # rồi điền .env

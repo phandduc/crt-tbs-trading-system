@@ -234,6 +234,8 @@ def main():
     ap.add_argument("--account", type=float, default=10_000.0, help="vốn tài khoản chung (USD) cho bảng balance")
     ap.add_argument("--risk-percent", type=float, default=1.0, help="%% vốn rủi ro mỗi lệnh cho bảng balance")
     args = ap.parse_args()
+    if not (0 < args.risk_percent <= 100 and args.account > 0):
+        sys.exit(f"✗ --risk-percent phải trong (0, 100] và --account > 0 (nhận {args.risk_percent}, {args.account}).")
 
     res = {1.0: [], 2.0: []}
     for sym in args.symbols:
