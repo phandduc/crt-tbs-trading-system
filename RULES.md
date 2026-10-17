@@ -68,7 +68,22 @@ Chạy đúng một lần. **Không đạt → không tinh chỉnh tham số tr�
 "trong mẫu" và chỉ được tin khi qua dữ liệu mới (Demo hoặc mã / giai đoạn chưa dùng).
 Đạt → vẫn chỉ là ứng viên: chạy Demo trước khi dùng tiền thật.
 
-## 5. Sổ chạy
+## 5. Lần chạy 2 — H4 → M5 (TRONG MẪU)
+
+Ghi 2026-10-17, TRƯỚC khi viết code và chạy. Người dùng yêu cầu sau khi lần chạy 1 (D → H1) không đạt.
+
+- **Đây là kết quả TRONG MẪU:** lần thử thứ 2 trên cùng dữ liệu, chọn sau khi đã thấy lần 1 thất bại. Số lần thử trên
+  dữ liệu này: **2**. Kể cả đạt mọi tiêu chí cũng chỉ là ứng viên yếu — phải qua Demo / dữ liệu mới mới được tin.
+- Khác lần 1 **chỉ ở khung** (theo tài liệu "Timeframe alignment": CRT H4 → TBS + Model #1 trên M5, short-term trading):
+  - Nến **H4** mở lúc 17:00 / 21:00 / 01:00 / 05:00 / 09:00 / 13:00 giờ New York (cùng gốc với nến D đóng 17:00 NY),
+    dựng từ nến M5; nến M5 dựng từ M1 (nhãn = mốc đầu nến).
+  - Key level = đỉnh / đáy swing **H4** (2 nến mỗi bên) chưa bị lấy. Nến 2 = nến H4 kế tiếp; quét, TBS, Orderblock,
+    xác nhận đều trên **M5** trong nến H4 đó.
+- Giữ nguyên mọi thứ khác ở mục 2–3: thân ≥ 50%, SL đỉnh vùng quét, TP1 50%, TP2 CRTL, chia 50/50 + BE, một lệnh mở
+  mỗi mã, chi phí (spread + 5 point), cùng 5 mã và dữ liệu, 30 ngày đầu khởi động.
+- Cùng 5 tiêu chí ở mục 4, chạy đúng một lần. Không đạt → không tinh chỉnh tiếp trên dữ liệu này.
+
+## 6. Sổ chạy
 
 | # | Ngày | Commit | Kết quả | Quyết định |
 |---|---|---|---|---|

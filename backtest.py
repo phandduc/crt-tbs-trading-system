@@ -1,7 +1,8 @@
 """
-backtest.py — Backtest CRT + TBS (D → H1) trên CSV của repo S2-4 cũ, mô phỏng lệnh trên nến M1. Không kết nối MT5.
+backtest.py — Backtest CRT + TBS trên CSV của repo S2-4 cũ, mô phỏng lệnh trên nến M1. Không kết nối MT5.
 
-    python backtest.py                         # 5 mã, chi phí ×1 và ×2, chấm tiêu chí RULES.md mục 4
+    python backtest.py                         # D → H1, 5 mã, chi phí ×1 và ×2, chấm tiêu chí RULES.md mục 4
+    python backtest.py --tf H4-M5              # lần chạy 2 (RULES.md mục 5, TRONG MẪU)
     python backtest.py --symbols XAUUSD --csv trades.csv
 
 Mô phỏng (RULES.md mục 3): giá Bid; chi phí (spread nến M1 khớp + 5 point) × hệ số trừ vào giá khớp;
@@ -28,6 +29,7 @@ SLIPPAGE_POINTS = 5.0
 WARMUP_DAYS = 30
 BOOTSTRAP_N, BOOTSTRAP_SEED = 10_000, 20261017
 CLOSED = {"SL", "TP1_BE", "TP1_TP2"}
+TIMEFRAMES = {"D-H1": (24, 60), "H4-M5": (4, 5)}    # (giờ / nến CRT, phút / nến vào lệnh)
 
 
 # ─── Dữ liệu ─────────────────────────────────────────────────────────────────
@@ -60,6 +62,13 @@ def load(symbol: str, root: Path) -> tuple:
         print(f"  ✓ {symbol} {key}: {len(df):,} nến {df['time'].iat[0]:%Y-%m-%d} → {df['time'].iat[-1]:%Y-%m-%d} "
               f"({' + '.join(DATASETS[symbol])}, sha256 khớp)")
     return out["H1"], out["M1"]
+
+
+def build_m5(m1: pd.DataFrame) -> pd.DataFrame:
+    """M5 từ M1 (nhãn = mốc ĐẦU nến, như MT5)."""
+    agg = {"open": "first", "high": "max", "low": "min", "close": "last"}
+    return (m1.set_index("time")[list(agg)].resample("5min", label="left", closed="left").agg(agg)
+              .dropna(subset=["open"]).reset_index())
 
 
 # ─── Mô phỏng (không gian BÁN; MUA lật giá) ─────────────────────────────────
@@ -161,17 +170,20 @@ def line(label: str, st: dict, st2: dict = None) -> str:
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Backtest CRT + TBS (D → H1), không kết nối MT5")
+    ap = argparse.ArgumentParser(description="Backtest CRT + TBS, không kết nối MT5")
+    ap.add_argument("--tf", default="D-H1", choices=list(TIMEFRAMES), help="khung nến CRT → khung vào lệnh")
     ap.add_argument("--symbols", nargs="+", type=str.upper, default=list(DATASETS), choices=list(DATASETS))
     ap.add_argument("--root", type=Path, default=OLD_REPO, help="repo chứa các thư mục data*/ (mặc định repo S2-4 cũ)")
     ap.add_argument("--csv", default=None, help="ghi danh sách lệnh (chi phí ×1) ra CSV")
     args = ap.parse_args()
+    htf_hours, ltf_minutes = TIMEFRAMES[args.tf]
 
     res = {1.0: [], 2.0: []}
     for sym in args.symbols:
         h1, m1 = load(sym, args.root)
+        ltf = h1 if ltf_minutes == 60 else build_m5(m1)
         from_ns = crt_tbs.ns(h1["time"].iloc[:1])[0] + WARMUP_DAYS * 24 * crt_tbs.NS_HOUR
-        orders = crt_tbs.find_orders(h1, from_ns)
+        orders = crt_tbs.find_orders(ltf, from_ns, htf_hours, ltf_minutes)
         arrays = {side: sim_arrays(m1, side) for side in ("SELL", "BUY")}
         for mult in res:
             res[mult] += run_symbol(sym, orders, arrays, mult)
@@ -179,7 +191,7 @@ def main():
 
     r1, r2 = res[1.0], res[2.0]
     head = f"  {'':<10} {'Lệnh':>5}  {'Win':>6}  {'E[R]':>7}  {'CI95':^18}  {'Tổng':>9}  {'Max DD':>9}"
-    print(f"\n{'=' * 96}\n KẾT QUẢ CRT + TBS (D → H1) — lệnh đã đóng, chi phí ×1 (cột cuối: E[R] chi phí ×2)\n{'=' * 96}")
+    print(f"\n{'=' * 96}\n KẾT QUẢ CRT + TBS ({args.tf.replace('-', ' → ')}) — lệnh đã đóng, chi phí ×1 (cột cuối: E[R] chi phí ×2)\n{'=' * 96}")
     print(head)
     by = lambda xs, f: [x for x in xs if f(x)]
     per_sym = {}
@@ -219,6 +231,8 @@ def main():
         for lab, ok in crit:
             print(f"    {'✓' if ok else '✗'} {lab}")
         print(f"  → {'ĐẠT (ứng viên, cần Demo)' if all(ok for _, ok in crit) else 'KHÔNG ĐẠT'}")
+        if args.tf != "D-H1":
+            print("  ⚠ Kết quả TRONG MẪU — lần thử thứ 2 trên cùng dữ liệu (RULES.md mục 5)")
 
     if args.csv:
         df = pd.DataFrame(r1)

@@ -1,7 +1,8 @@
 """
-crt_tbs.py — Chiến lược CRT + TBS (Candle Range Theory + Turtle Body Soup), khung D → H1. Quy tắc: RULES.md mục 2.
+crt_tbs.py — Chiến lược CRT + TBS (Candle Range Theory + Turtle Body Soup). Quy tắc: RULES.md mục 2 (D → H1),
+mục 5 (H4 → M5).
 
-Chỉ dùng nến đã đóng. Tín hiệu phát ra lúc nến H1 xác nhận đóng (created_ns); giá vào do bên chạy lệnh lấy
+Chỉ dùng nến đã đóng. Tín hiệu phát ra lúc nến LTF xác nhận đóng (created_ns); giá vào do bên chạy lệnh lấy
 (backtest: giá mở nến M1 đầu tiên từ created_ns; live: giá thị trường lúc đó).
 Chiều MUA tính bằng cách lật giá (−x) rồi dùng đúng logic chiều BÁN.
 """
@@ -9,7 +10,8 @@ Chiều MUA tính bằng cách lật giá (−x) rồi dùng đúng logic chiề
 import numpy as np
 import pandas as pd
 
-NS_HOUR = 3_600_000_000_000
+NS_MIN = 60_000_000_000
+NS_HOUR = 60 * NS_MIN
 THICK_BODY = 0.5      # nến CRT dày: thân ≥ 50% biên độ
 SWING_SIDE = 2        # đỉnh / đáy cũ D: cao / thấp hơn hẳn 2 nến mỗi bên
 
@@ -22,21 +24,22 @@ def ns(times) -> np.ndarray:
     return idx.as_unit("ns").asi8
 
 
-def trading_day(times: pd.Series) -> pd.Series:
-    """Ngày giao dịch của nến D chuẩn FX: đóng lúc 17:00 New York → giờ NY + 7 giờ rồi lấy ngày."""
+def htf_bucket(times: pd.Series, hours: int) -> pd.Series:
+    """Nến HTF chứa mỗi mốc: giờ New York + 7 giờ (nến D đóng 17:00 NY) rồi làm tròn xuống bội số `hours` giờ.
+    hours = 24 → nến D chuẩn FX; hours = 4 → nến H4 mở 17 / 21 / 01 / 05 / 09 / 13 giờ NY."""
     ny = times.dt.tz_convert("America/New_York").dt.tz_localize(None)
-    return (ny + pd.Timedelta(hours=7)).dt.normalize()
+    return (ny + pd.Timedelta(hours=7)).dt.floor(f"{hours}h")
 
 
-def daily(h1: pd.DataFrame) -> pd.DataFrame:
-    """Nến D từ H1 (h1 đã sắp theo thời gian): open/high/low/close + first/last = chỉ số nến H1 đầu / cuối của ngày."""
-    g = h1.assign(day=trading_day(h1["time"]).to_numpy(), idx=np.arange(len(h1))).groupby("day", sort=True)
+def htf_candles(ltf: pd.DataFrame, hours: int) -> pd.DataFrame:
+    """Nến HTF từ LTF (đã sắp theo thời gian): open/high/low/close + first/last = chỉ số nến LTF đầu / cuối."""
+    g = ltf.assign(bucket=htf_bucket(ltf["time"], hours).to_numpy(), idx=np.arange(len(ltf))).groupby("bucket", sort=True)
     return g.agg(open=("open", "first"), high=("high", "max"), low=("low", "min"), close=("close", "last"),
                  first=("idx", "first"), last=("idx", "last")).reset_index()
 
 
 def key_highs(hd: np.ndarray) -> np.ndarray:
-    """key[c] = nến D c có high ≥ một đỉnh swing D cũ chưa bị vượt (swing đã xác nhận trước nến c)."""
+    """key[c] = nến HTF c có high ≥ một đỉnh swing HTF cũ chưa bị vượt (swing đã xác nhận trước nến c)."""
     n, s = len(hd), SWING_SIDE
     key, levels = np.zeros(n, bool), []
     for c in range(n):
@@ -51,7 +54,7 @@ def key_highs(hd: np.ndarray) -> np.ndarray:
 
 def scan_candle2(O, H, C, i0: int, i1: int, crth: float):
     """
-    Chiều BÁN, nến H1 i0..i1 của nến D c + 1: quét CRTH → TBS (đóng cửa > CRTH) → nến đóng dưới giá mở
+    Chiều BÁN, nến LTF i0..i1 của nến HTF c + 1: quét CRTH → TBS (đóng cửa > CRTH) → nến đóng dưới giá mở
     của Orderblock (nến tăng gần nhất từ TBS trở đi). Trả (chỉ số nến xác nhận, đỉnh vùng quét) hoặc None.
     """
     purged, tbs, ob, top = False, False, None, -np.inf
@@ -73,12 +76,13 @@ def scan_candle2(O, H, C, i0: int, i1: int, crth: float):
     return None
 
 
-def find_orders(h1: pd.DataFrame, from_ns: int = 0) -> list:
-    """Mọi tín hiệu CRT + TBS trên h1 (cột time UTC, open, high, low, close), created_ns ≥ from_ns, theo thời gian."""
-    h1 = h1.sort_values("time").reset_index(drop=True)
-    d = daily(h1)
-    T = ns(h1["time"])
-    O, H, L, C = (h1[k].to_numpy(float) for k in ("open", "high", "low", "close"))
+def find_orders(ltf: pd.DataFrame, from_ns: int = 0, htf_hours: int = 24, ltf_minutes: int = 60) -> list:
+    """Mọi tín hiệu CRT + TBS trên nến LTF (cột time UTC, open, high, low, close), nến CRT khung `htf_hours` giờ dựng
+    từ chính LTF; created_ns ≥ from_ns, theo thời gian. Mặc định D → H1 (lần chạy 1)."""
+    ltf = ltf.sort_values("time").reset_index(drop=True)
+    d = htf_candles(ltf, htf_hours)
+    T = ns(ltf["time"])
+    O, H, L, C = (ltf[k].to_numpy(float) for k in ("open", "high", "low", "close"))
     do, dh, dl, dc = (d[k].to_numpy(float) for k in ("open", "high", "low", "close"))
     rng = dh - dl
     thick = (rng > 0) & (np.abs(dc - do) >= THICK_BODY * rng)
@@ -96,7 +100,8 @@ def find_orders(h1: pd.DataFrame, from_ns: int = 0) -> list:
             hit = scan_candle2(s * O, H if s > 0 else -L, s * C, i0, i1, crth)
             if hit:
                 i, top = hit
-                cands.append(dict(side=side, crt_day=d["day"].iat[c].date(), created_ns=int(T[i] + NS_HOUR),
+                cands.append(dict(side=side, crt_start=ltf["time"].iat[int(d["first"].iat[c])],
+                                  created_ns=int(T[i] + ltf_minutes * NS_MIN),
                                   sl=s * top, tp1=s * (crth + crtl) / 2, tp2=s * crtl))
         cands.sort(key=lambda o: o["created_ns"])
         if len(cands) == 2 and cands[0]["created_ns"] == cands[1]["created_ns"]:
