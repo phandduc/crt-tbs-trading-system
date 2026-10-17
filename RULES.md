@@ -20,22 +20,34 @@
 
 1. **Nến D** theo chuẩn FX (TradingView): đóng lúc **17:00 New York** (tự đổi giờ mùa hè). Dữ liệu nến là UTC.
    Dựng nến D từ nến H1.
+   Code: `crt_tbs.trading_day()`, `crt_tbs.daily()`.
 2. **Nến CRT** = nến D c đã đóng, **dày**: |close − open| ≥ 50% × (high − low). CRTH = high, CRTL = low, 50% = giữa.
+   Code: `crt_tbs.find_orders()` (biến `thick`).
 3. **Key level (đỉnh cũ D):** đỉnh swing D (cao hơn hẳn 2 nến mỗi bên, đã xác nhận trước nến c) **chưa bị nến nào vượt**;
    nến CRT c có high ≥ đỉnh đó (chạm / quét đỉnh cũ). Không giới hạn độ xa, không dung sai.
+   Code: `crt_tbs.key_highs()` (chiều MUA: gọi trên −low), gọi từ `crt_tbs.find_orders()`.
 4. **Chỉ trong nến D kế tiếp (c + 1)**, trên H1:
    - **Quét:** nến H1 đầu tiên có high > CRTH.
    - **TBS:** nến H1 đầu tiên **đóng cửa > CRTH**. Chỉ râu vượt (TWS) không tính.
    - **Orderblock (Model #1):** nến H1 TĂNG (close > open) gần nhất, tính từ nến TBS trở đi.
    - **Xác nhận:** một nến H1 sau TBS **đóng cửa < giá mở của Orderblock** → tín hiệu lúc nến này đóng.
    - Nến c + 1 đóng mà chưa xác nhận → huỷ setup.
+   Code: `crt_tbs.scan_candle2()` (quét, TBS — loại TWS vì chỉ xét giá đóng cửa —, Orderblock, xác nhận);
+   `crt_tbs.find_orders()` giới hạn trong các nến H1 của nến c + 1.
 5. **Vào lệnh thị trường** ngay khi nến xác nhận đóng (backtest: giá mở nến M1 đầu tiên từ lúc đó).
+   Code: backtest `backtest.simulate()`; live `bot.handle()` → `bot.send_market()` (giá Bid / Ask lúc quét).
 6. **SL** = high cao nhất từ nến quét tới nến xác nhận (đỉnh vùng quét). **TP1** = 50% nến CRT, **TP2** = CRTL.
+   Code: đỉnh vùng quét trong `crt_tbs.scan_candle2()`; SL / TP1 / TP2 gán trong `crt_tbs.find_orders()`.
 7. Bỏ lệnh nếu không có TP1 < giá vào < SL, hoặc khoảng SL ≤ chi phí (spread + 5 point).
+   Code: backtest `backtest.simulate()` (trạng thái BO_GIA_VAO); live `bot.handle()`.
 8. **Quản lý:** 50% khối lượng chốt ở TP1, 50% còn lại tới TP2; chạm TP1 → SL phần còn lại về giá khớp (từ nến M1 sau).
    Không giới hạn thời gian giữ lệnh.
+   Code: backtest `backtest.simulate()` (trạng thái TP1_TP2 / TP1_BE / SL); live `bot.split_lots()` + `bot.handle()`
+   (2 lệnh TP1 / TP2), `bot.manage()` + `bot._closed_at_tp()` (dời SL về giá vào).
 9. Một nến CRT tối đa một lệnh (nếu cả hai chiều cùng có tín hiệu: lấy tín hiệu xác nhận trước; trùng giờ → bỏ).
    **Một lệnh mở mỗi mã** — tín hiệu đến khi mã đang có lệnh → bỏ.
+   Code: một lệnh mỗi nến CRT trong `crt_tbs.find_orders()`; một lệnh mỗi mã: backtest `backtest.run_symbol()`
+   (trạng thái BAN), live `bot.handle()`.
 
 ## 3. Mô phỏng (backtest)
 
