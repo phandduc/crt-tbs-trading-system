@@ -7,10 +7,9 @@ echo    Rui ro / von chi doi bang balance (USD); so lieu theo R khong doi
 echo ======================================================
 echo   0. Ca 5 ma (co cham tieu chi RULES.md)
 echo   1. XAUUSD   2. EURUSD   3. GBPUSD   4. AUDUSD   5. NZDUSD
-echo   6. Ca 3 chi so US30 US100 US500 (co cham tieu chi RULES.md muc 6)
 set "syms="
 set "choice="
-set /p choice="Chon ma (0-6, Enter = 0): "
+set /p choice="Chon ma (0-5, Enter = 0): "
 if "%choice%"=="" set choice=0
 if "%choice%"=="0" set syms=XAUUSD EURUSD GBPUSD AUDUSD NZDUSD
 if "%choice%"=="1" set syms=XAUUSD
@@ -18,7 +17,6 @@ if "%choice%"=="2" set syms=EURUSD
 if "%choice%"=="3" set syms=GBPUSD
 if "%choice%"=="4" set syms=AUDUSD
 if "%choice%"=="5" set syms=NZDUSD
-if "%choice%"=="6" set syms=US30 US100 US500
 if not defined syms (
     echo Lua chon khong hop le: %choice%
     pause

@@ -22,13 +22,10 @@ import crt_tbs
 
 OLD_REPO = Path(r"C:\Users\Duc\.gemini\antigravity\scratch\xauusd_trading_bot")
 DATASETS = {"XAUUSD": ["data_2021", "data"], "EURUSD": ["data_2020", "data_2021", "data"],
-            "GBPUSD": ["data_2020"], "AUDUSD": ["data_2020"], "NZDUSD": ["data_2020"],
-            "US30": ["data_2020", "data_2022"], "US100": ["data_2020", "data_2022"], "US500": ["data_2020", "data_2022"]}
-POINT = {"XAUUSD": 0.01, "US30": 0.1, "US100": 0.1, "US500": 0.1}       # còn lại: FX 5 chữ số
+            "GBPUSD": ["data_2020"], "AUDUSD": ["data_2020"], "NZDUSD": ["data_2020"]}
+POINT = {"XAUUSD": 0.01}                  # còn lại: FX 5 chữ số
 # Nhóm mã có tiêu chí ghi trước → (số mã tối thiểu có E[R] > 0, mục RULES.md)
-GROUPS = {("XAUUSD", "EURUSD", "GBPUSD", "AUDUSD", "NZDUSD"): (4, 4), ("US30", "US100", "US500"): (3, 6)}
-# Spread tham chiếu (point): trung vị M1 06–16 UTC của một thư mục = 0 hoặc > 2 × tham chiếu → thay cả cột (RULES.md mục 6)
-SPREAD_REF = {"US30": 30.0, "US100": 18.0, "US500": 10.0}
+GROUPS = {("XAUUSD", "EURUSD", "GBPUSD", "AUDUSD", "NZDUSD"): (4, 4)}
 SLIPPAGE_POINTS = 5.0
 WARMUP_DAYS = 30
 BOOTSTRAP_N, BOOTSTRAP_SEED = 10_000, 20261017
@@ -59,16 +56,7 @@ def load(symbol: str, root: Path) -> tuple:
             actual = _sha256(path)
             if actual != expected:
                 sys.exit(f"✗ Hash {sub}/{path.name} KHÔNG KHỚP meta ({actual[:12]}… ≠ {str(expected)[:12]}…) — dừng.")
-            part = pd.read_csv(path, parse_dates=["time"])
-            if key == "M1" and symbol in SPREAD_REF:
-                ref = SPREAD_REF[symbol]
-                med = part.loc[part["time"].dt.hour.between(6, 15), "spread"].median()
-                replace = med == 0 or med > 2 * ref
-                if replace:
-                    part["spread"] = ref
-                print(f"    {sub}: spread M1 trung vị 06–16 UTC = {med:g} point → "
-                      + (f"THAY bằng {ref:g}" if replace else "giữ"))
-            parts.append(part)
+            parts.append(pd.read_csv(path, parse_dates=["time"]))
         df = pd.concat(parts).drop_duplicates("time", keep="first").sort_values("time").reset_index(drop=True)
         out[key] = df
         print(f"  ✓ {symbol} {key}: {len(df):,} nến {df['time'].iat[0]:%Y-%m-%d} → {df['time'].iat[-1]:%Y-%m-%d} "
@@ -243,7 +231,7 @@ def account_tables(results: list, account: float, risk_pct: float):
 def main():
     ap = argparse.ArgumentParser(description="Backtest CRT + TBS (D → H1), không kết nối MT5")
     ap.add_argument("--symbols", nargs="+", type=str.upper, default=list(next(iter(GROUPS))), choices=list(DATASETS),
-                    help="mặc định 5 mã lần chạy 1; US30 US100 US500 = lần chạy 3 (RULES.md mục 6)")
+                    help="mặc định 5 mã lần chạy 1")
     ap.add_argument("--root", type=Path, default=OLD_REPO, help="repo chứa các thư mục data*/ (mặc định repo S2-4 cũ)")
     ap.add_argument("--csv", default=None, help="ghi danh sách lệnh (chi phí ×1) ra CSV")
     ap.add_argument("--account", type=float, default=10_000.0, help="vốn tài khoản chung (USD) cho bảng balance")

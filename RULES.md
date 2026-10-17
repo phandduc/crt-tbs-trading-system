@@ -86,7 +86,10 @@ Ghi 2026-10-17, TRƯỚC khi viết code và chạy. Người dùng yêu cầu s
   mỗi mã, chi phí (spread + 5 point), cùng 5 mã và dữ liệu, 30 ngày đầu khởi động.
 - Cùng 5 tiêu chí ở mục 4, chạy đúng một lần. Không đạt → không tinh chỉnh tiếp trên dữ liệu này.
 
-## 6. Lần chạy 3 — kiểm tra NGOÀI MẪU trên chỉ số Mỹ (US30, US100, US500)
+## 6. Lần chạy 3 — kiểm tra NGOÀI MẪU trên chỉ số Mỹ (US30, US100, US500) — ĐÃ XOÁ KHỎI CODE
+
+> 2026-10-17, người dùng yêu cầu: xoá nhánh chỉ số (mã + quy tắc spread trong backtest, lựa chọn 6 của
+> `run_backtest.bat`, `run3.log`). Mục này và dòng 3 của sổ chạy giữ làm lịch sử. Khôi phục code: commit c59e711.
 
 Ghi 2026-10-17, TRƯỚC khi viết code và chạy. Người dùng yêu cầu.
 
