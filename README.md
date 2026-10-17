@@ -34,6 +34,7 @@ MetaTrader 5, gồm bộ backtest mô phỏng trên nến M1 và bot live báo t
 | **Chiến lược** (`crt_tbs.py`) | Một module thuần (không phụ thuộc MT5) dùng chung cho backtest và bot — cùng một quy tắc, không lệch logic |
 | **Backtest** (`backtest.py`) | Mô phỏng từng lệnh trên nến M1, tính chi phí spread + trượt giá, bootstrap CI95, bảng balance theo năm / tháng |
 | **Bot live** (`bot.py`) | Một tiến trình cho mọi mã; mặc định chỉ báo tín hiệu, tùy chọn tự vào 2 lệnh 50/50 và dời hoà vốn |
+| **Ảnh setup** (`plot_setup.py`) | Vẽ setup vào lệnh (khung D + H1, các mốc quét / TBS / Orderblock / Model #1, Entry / SL / TP, lý do) — bot gửi kèm mỗi tín hiệu Telegram; xuất ảnh các lệnh backtest ra PDF / PNG |
 | **Xuất dữ liệu** (`export_data.py`) | Lấy nến H1 + M1 từ MT5 (chỉ đọc), lưu kèm sha256 và kiểm M1 gộp khớp H1 |
 | **An toàn** | Dữ liệu backtest phải khớp sha256; bot chặn tự đặt lệnh trên tài khoản thật, sai tên mã, sai múi giờ sàn |
 
@@ -154,11 +155,30 @@ python bot.py          # Ctrl+C để dừng
 ```
 
 - Mỗi 30 giây: dời hoà vốn cho lệnh đang mở, quét tín hiệu ở nến H1 vừa đóng của từng mã.
+- Mỗi tín hiệu được gửi **kèm ảnh setup** (lưu ở `charts/`); vẽ hoặc gửi ảnh lỗi thì gửi tin nhắn chữ, không ảnh
+  hưởng việc vào lệnh (ảnh vẽ sau khi đặt lệnh).
 - `AUTO_TRADE=false`: gửi tín hiệu kèm lot gợi ý qua Telegram.
 - `AUTO_TRADE=true`: vào 2 lệnh thị trường 50/50 (TP1 / TP2, cùng SL); lệnh TP1 chốt lời → SL lệnh TP2 về giá vào.
 - Khởi động sẽ **dừng** nếu: tên mã không có trên sàn (kèm gợi ý tên gần giống), giờ sàn đi trước UTC quá 30 phút,
   hoặc `AUTO_TRADE` trên tài khoản thật khi chưa bật `ALLOW_REAL_ACCOUNT`.
 - Cần ≥ 30 000 nến H1 lịch sử: đặt MT5 *Tools → Options → Charts → Max bars in chart* = Unlimited.
+
+### Ảnh setup vào lệnh
+
+```powershell
+python plot_setup.py --symbol XAUUSD             # 10 lệnh backtest rải đều theo thời gian
+python plot_setup.py --symbol EURUSD --n 20
+```
+
+Ghi `reports/setups_<symbol>.pdf` (mỗi trang một lệnh) và ảnh PNG trong `reports/setups_<symbol>/`. Mỗi ảnh gồm:
+
+- **Khung D:** nến CRT (thân ≥ 50%), đỉnh / đáy D cũ mà nó chạm (key level), CRTH / 50% / CRTL.
+- **Khung H1:** nến CRT và nến D kế tiếp, nến quét, nến TBS, Orderblock (khung nâu) và giá mở của nó, nến xác nhận
+  Model #1, Entry / SL / TP1 / TP2, điểm đóng lệnh.
+- **Lý do vào lệnh** từng bước và kết quả mô phỏng (R).
+
+Mẫu: [`reports/setups_xauusd.pdf`](reports/setups_xauusd.pdf), [`reports/setups_eurusd.pdf`](reports/setups_eurusd.pdf).
+Các mốc lấy thẳng từ `crt_tbs.find_orders()` — ảnh khớp đúng quyết định của chiến lược.
 
 ### Xuất dữ liệu từ MT5
 
@@ -182,7 +202,8 @@ python test_bot.py                         # smoke test bot với MT5 giả (kh�
 |---|---|
 | `--leak` | Cắt dữ liệu ngay lúc phát mỗi tín hiệu → tín hiệu phải giống hệt (không dùng nến tương lai) |
 | `--window` | Bot chỉ có N nến H1 gần nhất → phải ra cùng tín hiệu như toàn bộ lịch sử (20 000 nến thì lỡ key level xa, 30 000 thì khớp) |
-| `test_bot.py` | Báo tín hiệu, đặt 2 lệnh, chống đặt trùng, dời hoà vốn, các lý do bỏ lệnh, các chốt chặn lúc khởi động |
+| `test_bot.py` | Báo tín hiệu kèm ảnh setup, đặt 2 lệnh, chống đặt trùng, dời hoà vốn, các lý do bỏ lệnh, các chốt chặn lúc khởi động |
+| `test_crt_tbs.py` (nhanh) | Thêm: các mốc setup (quét / TBS / Orderblock / key level) đúng, vẽ ảnh cả hai chiều ra PNG |
 
 ## Cấu trúc dự án
 
@@ -190,7 +211,8 @@ python test_bot.py                         # smoke test bot với MT5 giả (kh�
 crt_tbs/
 ├── crt_tbs.py            # Chiến lược: nến D, key level, TBS / Model #1 → tín hiệu
 ├── backtest.py           # Backtest M1 + thống kê + bảng balance
-├── bot.py                # Bot live MT5 + Telegram
+├── bot.py                # Bot live MT5 + Telegram (gửi kèm ảnh setup)
+├── plot_setup.py         # Vẽ ảnh setup vào lệnh (D + H1), dùng cho bot và backtest
 ├── export_data.py        # Xuất nến H1 + M1 từ MT5 (sha256)
 ├── run_backtest.bat      # Menu chạy backtest
 ├── test_crt_tbs.py       # Test chiến lược, leak test, window test

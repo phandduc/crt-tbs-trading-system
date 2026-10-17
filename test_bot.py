@@ -69,15 +69,18 @@ mt5 = FakeMT5()
 sys.modules["MetaTrader5"] = mt5
 import bot  # noqa: E402  (sau khi thay MetaTrader5 bằng bản giả)
 
-msgs = []
+msgs, photos = [], []
 bot.telegram = msgs.append
+bot.telegram_photo = lambda path, caption: (photos.append(path), msgs.append(caption)) and True
 bot.SYMBOLS = ["XAUUSD"]
 bot.STATE_FILE = Path(tempfile.mkdtemp()) / "state.json"
+bot.CHART_DIR = bot.STATE_FILE.parent / "charts"
 
 
 def fresh(**kw):
     mt5.reset(**kw)
     msgs.clear()
+    photos.clear()
     bot.STATE_FILE.unlink(missing_ok=True)
     return bot.load_state()
 
@@ -87,6 +90,7 @@ def test_alert_only():
     state = fresh()
     bot.scan("XAUUSD", state)
     assert len(msgs) == 1 and "Chỉ báo tín hiệu" in msgs[0] and "0.33 (TP1) + 0.33 (TP2)" in msgs[0], msgs
+    assert len(photos) == 1 and photos[0].exists(), photos               # tín hiệu gửi kèm ảnh setup
     assert mt5.sent == [] and len(state["orders"]) == 1
     bot.scan("XAUUSD", bot.load_state())                    # khởi động lại cùng giờ → không báo trùng
     assert len(msgs) == 1, msgs
@@ -101,6 +105,7 @@ def test_auto_trade_and_break_even():
     assert (b["volume"], b["tp"]) == (0.33, 97.5), b
     rec = next(iter(state["orders"].values()))
     assert rec["status"] == "open" and rec["tickets"] == [1001, 1002], rec
+    assert len(photos) == 1 and "Đã vào" in msgs[0], msgs                 # ảnh gửi SAU khi đặt lệnh
     p2 = NS(identifier=1002, ticket=1002, magic=bot.MAGIC, symbol="XAUUSD", price_open=112.0, tp=97.5)
     mt5.positions = [NS(identifier=1001, ticket=1001, magic=bot.MAGIC, symbol="XAUUSD", price_open=112.0, tp=104.75), p2]
     bot.manage(state)

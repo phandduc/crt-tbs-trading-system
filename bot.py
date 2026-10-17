@@ -8,6 +8,7 @@ bot.py — Bot live CRT + TBS (D → H1) trên MetaTrader 5, một tiến trình
 Mỗi 30 giây: quản lý lệnh đang mở, rồi với từng mã có nến H1 mới đóng (giờ sàn) → quét tín hiệu của ĐÚNG nến đó
 (crt_tbs.find_orders, cùng quy tắc với backtest). Nến bị lỡ khi bot tắt không quét bù; tín hiệu cũ hơn
 MAX_SIGNAL_AGE bị bỏ.
+  Mọi tín hiệu gửi Telegram kèm ảnh setup (plot_setup.py, lưu ở charts/); ảnh lỗi → gửi chữ.
   AUTO_TRADE=false (mặc định): chỉ báo Telegram (kèm lot gợi ý).
   AUTO_TRADE=true: 2 lệnh thị trường 50/50 cùng SL (TP1 / TP2); lệnh TP1 đóng ở TP → SL lệnh TP2 về giá vào.
   Bỏ tín hiệu nếu: mã đang có lệnh của bot, giá ngoài khoảng TP1–SL, SL ≤ spread + 5 point, lot không chia đôi được.
@@ -20,6 +21,7 @@ import os
 import sys
 import time
 import urllib.request
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -27,6 +29,7 @@ import MetaTrader5 as mt5
 import pandas as pd
 
 import crt_tbs
+import plot_setup
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -57,6 +60,7 @@ except ValueError as e:      # dừng thay vì đoán: rủi ro / giờ nến sa
 
 MAGIC = 20261017
 STATE_FILE = BASE_DIR / "state.json"
+CHART_DIR = BASE_DIR / "charts"         # ảnh setup của từng tín hiệu (plot_setup.py)
 H1_BARS = 100_000           # lấy tối đa lịch sử sàn có: đỉnh / đáy D cũ có thể xa > 3 năm
 MIN_H1_BARS = 30_000        # 30 000 nến (~5 năm) ra cùng tín hiệu như lịch sử đầy đủ, 20 000 thì không
                             # (test_crt_tbs.py --window); ít hơn → cảnh báo
@@ -81,6 +85,27 @@ def telegram(text: str) -> bool:
             return bool(json.loads(r.read().decode("utf-8")).get("ok"))
     except Exception as e:
         print(f"  Lỗi gửi Telegram: {e}")
+        return False
+
+
+def telegram_photo(path: Path, caption: str) -> bool:
+    """Gửi ảnh kèm chú thích (sendPhoto, multipart). False nếu chưa cấu hình / lỗi → bên gọi gửi tin nhắn chữ."""
+    print(f"[{datetime.now():%H:%M:%S}] {caption}\n  ảnh: {path}")
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return False
+    b = uuid.uuid4().hex
+    fields = {"chat_id": TELEGRAM_CHAT_ID, "caption": caption[:1024], "parse_mode": "HTML"}
+    body = b"".join(f'--{b}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode("utf-8")
+                    for k, v in fields.items())
+    body += (f'--{b}\r\nContent-Disposition: form-data; name="photo"; filename="{path.name}"\r\n'
+             f"Content-Type: image/png\r\n\r\n").encode("utf-8") + path.read_bytes() + f"\r\n--{b}--\r\n".encode()
+    req = urllib.request.Request(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto", data=body,
+                                 headers={"Content-Type": f"multipart/form-data; boundary={b}"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return bool(json.loads(r.read().decode("utf-8")).get("ok"))
+    except Exception as e:
+        print(f"  Lỗi gửi ảnh Telegram: {e}")
         return False
 
 
@@ -180,10 +205,11 @@ def scan(symbol: str, state: dict):
     for o in crt_tbs.find_orders(h1, from_ns=last_close_ns):
         oid = f"{symbol}|{o['crt_day']}|{o['side']}"
         if oid not in state["orders"]:
-            handle(symbol, oid, o, state)
+            handle(symbol, oid, o, state, h1)
 
 
-def handle(symbol: str, oid: str, o: dict, state: dict):
+def handle(symbol: str, oid: str, o: dict, state: dict, h1: pd.DataFrame = None):
+    """Xử lý một tín hiệu (bỏ / chỉ báo / vào lệnh) rồi báo Telegram kèm ảnh setup (vẽ SAU khi đặt lệnh)."""
     info, tick = mt5.symbol_info(symbol), mt5.symbol_info_tick(symbol)
     s = 1.0 if o["side"] == "SELL" else -1.0                     # không gian BÁN: s × giá
     rec = dict(symbol=symbol, side=o["side"], sl=o["sl"], tp1=o["tp1"], tp2=o["tp2"], crt_day=str(o["crt_day"]),
@@ -213,15 +239,28 @@ def handle(symbol: str, oid: str, o: dict, state: dict):
     head = (f"{'🔴 BÁN' if s > 0 else '🟢 MUA'} <b>{symbol}</b> — CRT + TBS (D → H1)\n"
             f"Nến CRT {rec['crt_day']} | giá {px(price)} | SL {px(o['sl'])} | TP1 {px(o['tp1'])} | TP2 {px(o['tp2'])}"
             + (f" | RR tới TP1 {rr:.2f}" if rr else ""))
+
+    def notify(text):
+        """Gửi kèm ảnh setup; vẽ / gửi ảnh lỗi → gửi chữ (không để lỗi vẽ ảnh chặn bot)."""
+        try:
+            png = CHART_DIR / f"{oid.replace('|', '_')}.png"
+            plot_setup.plot_setup(h1, o, info.digits if info else 5, entry=price, out_png=png,
+                                  title=f"CRT + TBS | {symbol} {o['side']} | nến CRT {o['crt_day']}")
+            if telegram_photo(png, text):
+                return
+        except Exception as e:
+            print(f"  Lỗi vẽ ảnh setup: {e!r}")
+        telegram(text)
+
     if reason:
         rec.update(status="done", reason=reason, done_at=time.time())
         save_state(state)
-        telegram(f"{head}\n⏭️ Bỏ: {reason}")
+        notify(f"{head}\n⏭️ Bỏ: {reason}")
         return
     if not AUTO_TRADE:
         rec.update(status="done", done_at=time.time())
         save_state(state)
-        telegram(f"{head}\n📣 Chỉ báo tín hiệu (AUTO_TRADE tắt) — lot gợi ý {vols[0]} (TP1) + {vols[1]} (TP2)")
+        notify(f"{head}\n📣 Chỉ báo tín hiệu (AUTO_TRADE tắt) — lot gợi ý {vols[0]} (TP1) + {vols[1]} (TP2)")
         return
     errors = []
     for n, (vol, tp) in enumerate(zip(vols, (o["tp1"], o["tp2"])), 1):
@@ -232,8 +271,8 @@ def handle(symbol: str, oid: str, o: dict, state: dict):
     placed = [t for t in rec["tickets"] if t is not None]
     rec.update(volumes=vols, status="open" if placed else "done", done_at=None if placed else time.time())
     save_state(state)
-    telegram(f"{head}\n✅ Đã vào {vols[0]} + {vols[1]} lot, ticket {placed}"
-             + (f"\n⚠️ Lỗi: {'; '.join(errors)}" if errors else ""))
+    notify(f"{head}\n✅ Đã vào {vols[0]} + {vols[1]} lot, ticket {placed}"
+           + (f"\n⚠️ Lỗi: {'; '.join(errors)}" if errors else ""))
 
 
 # ─── Quản lý lệnh ───────────────────────────────────────────────────────────────

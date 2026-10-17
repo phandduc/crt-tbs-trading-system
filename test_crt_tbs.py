@@ -8,6 +8,7 @@ test_crt_tbs.py — Kiểm logic CRT + TBS bằng dữ liệu tự dựng + ki�
 """
 
 import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -58,6 +59,22 @@ def test_signal(flip: bool):
     assert o["side"] == ("BUY" if flip else "SELL"), o
     assert o["created_ns"] == (START + pd.Timedelta(hours=6 * 24 + 5)).value, o
     assert (o["sl"], o["tp1"], o["tp2"]) == (s * 113.5, s * 104.75, s * 97.5), o
+    # mốc vẽ ảnh: key level 110 (ngày 2); quét = nến 1, TBS = nến 2, Orderblock = nến 3 của nến D kế tiếp
+    bar_ns = lambda k: (START + pd.Timedelta(hours=6 * 24 + k)).value
+    assert o["key_level"] == s * 110, o
+    assert (o["sweep_ns"], o["tbs_ns"], o["ob_ns"]) == (bar_ns(1), bar_ns(2), bar_ns(3)), o
+
+
+def test_plot():
+    """Vẽ ảnh setup cả hai chiều không lỗi và ra file PNG."""
+    import tempfile
+    import plot_setup
+    out = Path(tempfile.mkdtemp())
+    for flip in (False, True):
+        h1 = synthetic_h1(flip)
+        o = crt_tbs.find_orders(h1)[0]
+        png = plot_setup.plot_setup(h1, o, 2, out_png=out / f"setup_{flip}.png")
+        assert png.exists() and png.stat().st_size > 10_000, png
 
 
 def test_no_signal_without_key_level():
@@ -126,6 +143,7 @@ if __name__ == "__main__":
     test_signal(flip=True)
     test_no_signal_without_key_level()
     test_simulate()
+    test_plot()
     print("  test nhanh: đạt")
     if "--leak" in sys.argv:
         test_leak()

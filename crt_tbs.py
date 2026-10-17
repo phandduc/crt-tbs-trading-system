@@ -36,15 +36,17 @@ def daily(h1: pd.DataFrame) -> pd.DataFrame:
 
 
 def key_highs(hd: np.ndarray) -> np.ndarray:
-    """key[c] = nến D c có high ≥ một đỉnh swing D cũ chưa bị vượt (swing đã xác nhận trước nến c)."""
+    """key[c] = đỉnh swing D cũ chưa bị vượt (swing đã xác nhận trước nến c) mà nến D c có high ≥ nó — lấy đỉnh
+    cao nhất nếu chạm nhiều đỉnh; NaN nếu không có (nến c không ở key level)."""
     n, s = len(hd), SWING_SIDE
-    key, levels = np.zeros(n, bool), []
+    key, levels = np.full(n, np.nan), []
     for c in range(n):
         k = c - s - 1                     # swing k xác nhận khi nến k + s đóng = nến c − 1
         if k >= s and hd[k] > hd[k - s:k].max() and hd[k] > hd[k + 1:k + s + 1].max():
             levels.append(hd[k])
-        if any(hd[c] >= x for x in levels):
-            key[c] = True
+        taken = [x for x in levels if hd[c] >= x]
+        if taken:
+            key[c] = max(taken)
             levels = [x for x in levels if hd[c] < x]
     return key
 
@@ -52,24 +54,25 @@ def key_highs(hd: np.ndarray) -> np.ndarray:
 def scan_candle2(O, H, C, i0: int, i1: int, crth: float):
     """
     Chiều BÁN, nến H1 i0..i1 của nến D c + 1: quét CRTH → TBS (đóng cửa > CRTH) → nến đóng dưới giá mở
-    của Orderblock (nến tăng gần nhất từ TBS trở đi). Trả (chỉ số nến xác nhận, đỉnh vùng quét) hoặc None.
+    của Orderblock (nến tăng gần nhất từ TBS trở đi). Trả dict(i = nến xác nhận, top = đỉnh vùng quét,
+    sweep / tbs / ob = chỉ số nến quét / TBS / Orderblock) hoặc None.
     """
-    purged, tbs, ob, top = False, False, None, -np.inf
+    sweep, tbs, ob, top = None, None, None, -np.inf
     for i in range(i0, i1 + 1):
-        if H[i] > crth:
-            purged = True
-        if purged:
+        if sweep is None and H[i] > crth:
+            sweep = i
+        if sweep is not None:
             top = max(top, H[i])
-        if not tbs:
+        if tbs is None:
             if C[i] > crth:
-                tbs = True
+                tbs = i
                 if C[i] > O[i]:
-                    ob = O[i]
+                    ob = i
             continue
-        if ob is not None and C[i] < ob:
-            return i, top
+        if ob is not None and C[i] < O[ob]:
+            return dict(i=i, top=top, sweep=sweep, tbs=tbs, ob=ob)
         if C[i] > O[i]:
-            ob = O[i]
+            ob = i
     return None
 
 
@@ -90,14 +93,16 @@ def find_orders(h1: pd.DataFrame, from_ns: int = 0) -> list:
         i0, i1 = int(d["first"].iat[c + 1]), int(d["last"].iat[c + 1])
         cands = []
         for side, (s, key) in sides.items():
-            if not key[c]:
+            if np.isnan(key[c]):
                 continue
             crth, crtl = (dh[c], dl[c]) if s > 0 else (-dl[c], -dh[c])   # không gian BÁN
             hit = scan_candle2(s * O, H if s > 0 else -L, s * C, i0, i1, crth)
             if hit:
-                i, top = hit
-                cands.append(dict(side=side, crt_day=d["day"].iat[c].date(), created_ns=int(T[i] + NS_HOUR),
-                                  sl=s * top, tp1=s * (crth + crtl) / 2, tp2=s * crtl))
+                cands.append(dict(side=side, crt_day=d["day"].iat[c].date(), created_ns=int(T[hit["i"]] + NS_HOUR),
+                                  sl=s * hit["top"], tp1=s * (crth + crtl) / 2, tp2=s * crtl,
+                                  # mốc để vẽ ảnh setup (plot_setup.py): mức key level, giờ mở nến quét / TBS / OB
+                                  key_level=s * key[c], sweep_ns=int(T[hit["sweep"]]), tbs_ns=int(T[hit["tbs"]]),
+                                  ob_ns=int(T[hit["ob"]])))
         cands.sort(key=lambda o: o["created_ns"])
         if len(cands) == 2 and cands[0]["created_ns"] == cands[1]["created_ns"]:
             continue                       # hai chiều xác nhận cùng nến → mơ hồ, bỏ

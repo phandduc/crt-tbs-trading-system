@@ -3,3 +3,6 @@ __pycache__/
 .env
 state.json
 state.tmp
+graphify-out
+charts/
+reports/setups_*/
