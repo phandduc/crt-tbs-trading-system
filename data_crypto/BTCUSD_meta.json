@@ -1,0 +1,31 @@
+{
+  "symbol": "Bitcoin.s",
+  "name": "BTCUSD",
+  "broker": "Bacera Co Pty Ltd",
+  "server": "BCR-MT5",
+  "exported_at": "2026-10-17T15:50:24.831165+00:00",
+  "point": 0.01,
+  "digits": 2,
+  "contract": 1.0,
+  "server_timezone": "UTC (BCR-MT5)",
+  "timeframes": {
+    "H1": {
+      "file": "BTCUSD_H1.csv",
+      "sha256": "ef2f789ed9e5a83fbbf7bdeb8a6eddd63771540dc62cb669dddc40b23718d89e",
+      "bars": 15117,
+      "first_time": "2024-05-13T04:00:00+00:00",
+      "last_time": "2026-10-16T20:00:00+00:00"
+    },
+    "M1": {
+      "file": "BTCUSD_M1.csv",
+      "sha256": "ef5d9f78cac5464d951d435a186c217f75354d7b92f694ab711f74c756b20ada",
+      "bars": 903604,
+      "first_time": "2024-05-13T04:59:00+00:00",
+      "last_time": "2026-10-16T20:54:00+00:00"
+    }
+  },
+  "verify": {
+    "h1_hours_compared": 15116,
+    "m1_to_h1_ohlc_mismatch_hours": 0
+  }
+}

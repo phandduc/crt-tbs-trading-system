@@ -23,9 +23,12 @@ import crt_tbs
 OLD_REPO = Path(r"C:\Users\Duc\.gemini\antigravity\scratch\xauusd_trading_bot")
 DATASETS = {"XAUUSD": ["data_2021", "data"], "EURUSD": ["data_2020", "data_2021", "data"],
             "GBPUSD": ["data_2020"], "AUDUSD": ["data_2020"], "NZDUSD": ["data_2020"]}
-POINT = {"XAUUSD": 0.01}                  # còn lại: FX 5 chữ số
+CRYPTO_DIR = str(Path(__file__).resolve().parent / "data_crypto")    # export_data.py (RULES.md mục 7)
+DATASETS.update(BTCUSD=[CRYPTO_DIR], ETHUSD=[CRYPTO_DIR])
+POINT = {"XAUUSD": 0.01, "BTCUSD": 0.01, "ETHUSD": 0.01}             # còn lại: FX 5 chữ số
+UTC_DAY = {"BTCUSD", "ETHUSD"}            # nến D 00:00 UTC (crypto); còn lại 17:00 New York
 # Nhóm mã có tiêu chí ghi trước → (số mã tối thiểu có E[R] > 0, mục RULES.md)
-GROUPS = {("XAUUSD", "EURUSD", "GBPUSD", "AUDUSD", "NZDUSD"): (4, 4)}
+GROUPS = {("XAUUSD", "EURUSD", "GBPUSD", "AUDUSD", "NZDUSD"): (4, 4), ("BTCUSD", "ETHUSD"): (2, 7)}
 SLIPPAGE_POINTS = 5.0
 WARMUP_DAYS = 30
 BOOTSTRAP_N, BOOTSTRAP_SEED = 10_000, 20261017
@@ -58,9 +61,17 @@ def load(symbol: str, root: Path) -> tuple:
                 sys.exit(f"✗ Hash {sub}/{path.name} KHÔNG KHỚP meta ({actual[:12]}… ≠ {str(expected)[:12]}…) — dừng.")
             parts.append(pd.read_csv(path, parse_dates=["time"]))
         df = pd.concat(parts).drop_duplicates("time", keep="first").sort_values("time").reset_index(drop=True)
+        if key == "M1" and symbol in UTC_DAY:
+            # spread = 0 là giá trị điền sẵn → tỉ lệ spread / giá trung vị của các nến có spread thật (RULES.md mục 7)
+            zero = df["spread"] == 0
+            if zero.any():
+                df["spread"] = df["spread"].astype(float)
+                ratio = (df.loc[~zero, "spread"] / df.loc[~zero, "close"]).median()
+                df.loc[zero, "spread"] = ratio * df.loc[zero, "close"]
+                print(f"    spread = 0 ở {zero.mean():.1%} nến M1 → thay bằng {ratio * POINT[symbol] * 100:.3f}% giá")
         out[key] = df
         print(f"  ✓ {symbol} {key}: {len(df):,} nến {df['time'].iat[0]:%Y-%m-%d} → {df['time'].iat[-1]:%Y-%m-%d} "
-              f"({' + '.join(DATASETS[symbol])}, sha256 khớp)")
+              f"({' + '.join(Path(s).name for s in DATASETS[symbol])}, sha256 khớp)")
     return out["H1"], out["M1"]
 
 
@@ -231,7 +242,7 @@ def account_tables(results: list, account: float, risk_pct: float):
 def main():
     ap = argparse.ArgumentParser(description="Backtest CRT + TBS (D → H1), không kết nối MT5")
     ap.add_argument("--symbols", nargs="+", type=str.upper, default=list(next(iter(GROUPS))), choices=list(DATASETS),
-                    help="mặc định 5 mã lần chạy 1")
+                    help="mặc định 5 mã lần chạy 1; BTCUSD ETHUSD = lần chạy 4 (RULES.md mục 7)")
     ap.add_argument("--root", type=Path, default=OLD_REPO, help="repo chứa các thư mục data*/ (mặc định repo S2-4 cũ)")
     ap.add_argument("--csv", default=None, help="ghi danh sách lệnh (chi phí ×1) ra CSV")
     ap.add_argument("--account", type=float, default=10_000.0, help="vốn tài khoản chung (USD) cho bảng balance")
@@ -244,7 +255,7 @@ def main():
     for sym in args.symbols:
         h1, m1 = load(sym, args.root)
         from_ns = crt_tbs.ns(h1["time"].iloc[:1])[0] + WARMUP_DAYS * 24 * crt_tbs.NS_HOUR
-        orders = crt_tbs.find_orders(h1, from_ns)
+        orders = crt_tbs.find_orders(h1, from_ns, utc_day=sym in UTC_DAY)
         arrays = {side: sim_arrays(m1, side) for side in ("SELL", "BUY")}
         for mult in res:
             res[mult] += run_symbol(sym, orders, arrays, mult)

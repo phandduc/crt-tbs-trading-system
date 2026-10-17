@@ -117,7 +117,37 @@ Ghi nhận trước: 3 chỉ số Mỹ đi rất sát nhau → lệnh trùng ng�
 thực tế (tiêu chí 2 dễ đạt hơn đáng có). Chạy đúng một lần. Không đạt → không tinh chỉnh trên dữ liệu này.
 Đạt → vẫn chỉ là ứng viên trên chỉ số: cần Demo trước khi dùng tiền thật.
 
-## 7. Sổ chạy
+## 7. Lần chạy 4 — kiểm tra NGOÀI MẪU trên crypto (BTC, ETH)
+
+Ghi 2026-10-17, sau khi xuất và xem dữ liệu (spread, giờ giao dịch), TRƯỚC khi chạy chiến lược trên dữ liệu này.
+Người dùng yêu cầu; người dùng chọn nến D crypto đóng **00:00 UTC** (chuẩn TradingView / sàn crypto).
+
+- **Lưu ý thử nhiều thị trường:** đây là nhóm thị trường ngoài mẫu thứ 2 (sau chỉ số Mỹ — không đạt). Thử nhiều thị
+  trường rồi chọn cái đạt cũng là "chọn theo may" → kể cả đạt cũng chỉ là ứng viên, phải qua Demo.
+- **Dữ liệu** (`export_data.py`, BCR-MT5 Demo, mã sàn `Bitcoin.s` / `Ethereum.s`, sha256 trong
+  `data_crypto/<NAME>_meta.json`, M1 gộp H1 khớp H1 của sàn 100%): BTCUSD 2024-05-13 → 2026-10-16 (sàn chỉ có từ
+  đó); ETHUSD 2018-06-28 → 2026-10-16. 30 ngày đầu khởi động. point 0,01 cả hai.
+- **Nến D 00:00 UTC; nến H1 từ 17:00 giờ New York ngày Chủ nhật trở đi tính vào nến thứ Hai.** Lý do: trên BCR crypto
+  KHÔNG giao dịch cuối tuần (mở Chủ nhật 21–22 giờ UTC = 17:00 New York, đóng thứ Sáu 21 giờ UTC) → không gộp thì có
+  nến D Chủ nhật chỉ 2–3 giờ. Riêng ETH 2021–2023 sàn mở cả cuối tuần (25% số nến) → các năm đó có nến Thứ Bảy /
+  Chủ nhật đầy đủ, chỉ 2–3 giờ cuối Chủ nhật chuyển sang thứ Hai. Quy tắc chỉ dựa trên giờ của nến (không nhìn trước).
+- **Spread:** BTC dùng nguyên. ETH: nến M1 có spread = 0 (điền sẵn, 2018 → 2023) được thay bằng
+  trung vị (spread × point / giá) của các nến có spread > 0 × giá đóng nến đó / point (= 0,261% giá, áp cho 65,4% số
+  nến M1 — chi phí thật của sàn này hiện nay, thận trọng cho các năm cũ).
+- Mọi quy tắc khác giữ nguyên mục 2–3 (dày ≥ 50%, đỉnh / đáy D cũ, TBS, Model #1, SL đỉnh vùng quét, TP1 50%, TP2,
+  50 / 50 + BE, một lệnh mỗi mã, chi phí spread + 5 point, ×2).
+
+**Tiêu chí đạt (đủ TẤT CẢ, cùng khuôn mục 4):**
+1. E[R] gộp 2 mã > 0 ở chi phí ×1 VÀ ×2.
+2. CI95 bootstrap của E[R] gộp (×1) có cận dưới > 0.
+3. E[R] > 0 trên CẢ 2 mã (×1).
+4. E[R] gộp > 0 ở cả MUA VÀ BÁN (×1).
+5. E[R] gộp > 0 ở ≥ 2/3 số năm (theo năm khớp lệnh) có ≥ 20 lệnh (×1).
+
+Ghi nhận trước: BTC chỉ ~2,4 năm dữ liệu (ít lệnh); BTC và ETH tương quan cao (CI95 gộp hẹp hơn thực tế). Chạy đúng
+một lần; không đạt → không tinh chỉnh trên dữ liệu này.
+
+## 8. Sổ chạy
 
 | # | Ngày | Commit | Kết quả | Quyết định |
 |---|---|---|---|---|
