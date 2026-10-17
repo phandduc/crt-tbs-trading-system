@@ -106,8 +106,8 @@ lần 1 ([RULES.md mục 8](RULES.md#8-loại-nzdusd-2026-10-17-người-dùng-y
 *Algo Trading* (chỉ cần cho bot và xuất dữ liệu; backtest không cần MT5).
 
 ```powershell
-git clone <repo-url> crt_tbs
-cd crt_tbs
+git clone https://github.com/phandduc/crt-tbs-trading-system.git
+cd crt-tbs-trading-system
 pip install MetaTrader5 pandas numpy
 ```
 
