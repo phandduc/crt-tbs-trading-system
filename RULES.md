@@ -68,7 +68,10 @@ Chạy đúng một lần. **Không đạt → không tinh chỉnh tham số tr�
 "trong mẫu" và chỉ được tin khi qua dữ liệu mới (Demo hoặc mã / giai đoạn chưa dùng).
 Đạt → vẫn chỉ là ứng viên: chạy Demo trước khi dùng tiền thật.
 
-## 5. Lần chạy 2 — H4 → M5 (TRONG MẪU)
+## 5. Lần chạy 2 — H4 → M5 (TRONG MẪU) — ĐÃ XOÁ KHỎI CODE
+
+> 2026-10-17, người dùng yêu cầu: xoá toàn bộ nhánh H4 → M5 (code, `run2.log`, báo cáo). Mục này và dòng 2 của sổ chạy
+> giữ lại làm lịch sử: số lần thử trên dữ liệu này vẫn là **2**. Khôi phục code: commit bb29202.
 
 Ghi 2026-10-17, TRƯỚC khi viết code và chạy. Người dùng yêu cầu sau khi lần chạy 1 (D → H1) không đạt.
 
