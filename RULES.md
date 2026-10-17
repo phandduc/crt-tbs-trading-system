@@ -164,7 +164,16 @@ Người dùng yêu cầu; người dùng chọn nến D crypto đóng **00:00 U
 Ghi nhận trước: BTC chỉ ~2,4 năm dữ liệu (ít lệnh); BTC và ETH tương quan cao (CI95 gộp hẹp hơn thực tế). Chạy đúng
 một lần; không đạt → không tinh chỉnh trên dữ liệu này.
 
-## 8. Sổ chạy
+## 8. Loại NZDUSD (2026-10-17, người dùng yêu cầu)
+
+- Bỏ NZDUSD khỏi backtest (mặc định còn 4 mã: XAUUSD, EURUSD, GBPUSD, AUDUSD), bot (`SYMBOLS` mặc định) và
+  `run_backtest.bat`. Gỡ phần chấm tiêu chí tự động trong `backtest.py` (chỉ áp cho nhóm 5 mã của lần chạy 1).
+- **Quyết định này đưa ra SAU KHI thấy kết quả lần chạy 1** (NZD là mã tệ nhất, E[R] −0,18) → mọi kết quả 4 mã từ
+  nay là **TRONG MẪU**, không phải kiểm tra mới. Kết luận lần chạy 1 (**KHÔNG ĐẠT**, 5 mã) giữ nguyên.
+- Một lệnh mở mỗi mã tính riêng từng mã → bỏ NZD không đổi lệnh của 4 mã còn lại (số liệu 4 mã = lần chạy 1 trừ NZD).
+- Báo cáo 5 mã gốc giữ ở `reports/thong_ke_D-H1.txt`; báo cáo 4 mã: `reports/thong_ke_D-H1_4ma.txt`.
+
+## 9. Sổ chạy
 
 | # | Ngày | Commit | Kết quả | Quyết định |
 |---|---|---|---|---|

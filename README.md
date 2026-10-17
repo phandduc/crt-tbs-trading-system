@@ -30,7 +30,7 @@ Quy tắc, tiêu chí và sổ chạy: **[RULES.md](RULES.md)** — đọc trư�
 
 ```
 pip install MetaTrader5 pandas numpy
-python backtest.py                    # 5 mã, ~40 giây, vốn 10 000 USD, rủi ro 1% / lệnh
+python backtest.py                    # 4 mã (XAU, EUR, GBP, AUD), ~35 giây, vốn 10 000 USD, rủi ro 1% / lệnh
 python backtest.py --symbols XAUUSD --risk-percent 2 --account 5000
 run_backtest.bat                      # bấm đúp: hỏi mã, % rủi ro, vốn
 python test_crt_tbs.py --leak --window

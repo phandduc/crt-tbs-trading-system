@@ -1,7 +1,8 @@
 """
 backtest.py — Backtest CRT + TBS (D → H1) trên CSV của repo S2-4 cũ, mô phỏng lệnh trên nến M1. Không kết nối MT5.
 
-    python backtest.py                         # 5 mã, chi phí ×1 và ×2, chấm tiêu chí RULES.md mục 4
+    python backtest.py                         # 4 mã (XAU, EUR, GBP, AUD), chi phí ×1 và ×2
+                                               # (tiêu chí + kết quả các lần chạy ghi trước: RULES.md)
     python backtest.py --symbols XAUUSD --csv trades.csv
 
 Mô phỏng (RULES.md mục 3): giá Bid; chi phí (spread nến M1 khớp + 5 point) × hệ số trừ vào giá khớp;
@@ -22,10 +23,8 @@ import crt_tbs
 
 OLD_REPO = Path(r"C:\Users\Duc\.gemini\antigravity\scratch\xauusd_trading_bot")
 DATASETS = {"XAUUSD": ["data_2021", "data"], "EURUSD": ["data_2020", "data_2021", "data"],
-            "GBPUSD": ["data_2020"], "AUDUSD": ["data_2020"], "NZDUSD": ["data_2020"]}
+            "GBPUSD": ["data_2020"], "AUDUSD": ["data_2020"]}     # NZDUSD đã loại (RULES.md mục 8)
 POINT = {"XAUUSD": 0.01}                  # còn lại: FX 5 chữ số
-# Nhóm mã có tiêu chí ghi trước → (số mã tối thiểu có E[R] > 0, mục RULES.md)
-GROUPS = {("XAUUSD", "EURUSD", "GBPUSD", "AUDUSD", "NZDUSD"): (4, 4)}
 SLIPPAGE_POINTS = 5.0
 WARMUP_DAYS = 30
 BOOTSTRAP_N, BOOTSTRAP_SEED = 10_000, 20261017
@@ -230,8 +229,7 @@ def account_tables(results: list, account: float, risk_pct: float):
 
 def main():
     ap = argparse.ArgumentParser(description="Backtest CRT + TBS (D → H1), không kết nối MT5")
-    ap.add_argument("--symbols", nargs="+", type=str.upper, default=list(next(iter(GROUPS))), choices=list(DATASETS),
-                    help="mặc định 5 mã lần chạy 1")
+    ap.add_argument("--symbols", nargs="+", type=str.upper, default=list(DATASETS), choices=list(DATASETS))
     ap.add_argument("--root", type=Path, default=OLD_REPO, help="repo chứa các thư mục data*/ (mặc định repo S2-4 cũ)")
     ap.add_argument("--csv", default=None, help="ghi danh sách lệnh (chi phí ×1) ra CSV")
     ap.add_argument("--account", type=float, default=10_000.0, help="vốn tài khoản chung (USD) cho bảng balance")
@@ -255,10 +253,8 @@ def main():
     print(f"\n{'=' * 96}\n KẾT QUẢ CRT + TBS (D → H1) — lệnh đã đóng, chi phí ×1 (cột cuối: E[R] chi phí ×2)\n{'=' * 96}")
     print(head)
     by = lambda xs, f: [x for x in xs if f(x)]
-    per_sym = {}
     for sym in args.symbols:
-        per_sym[sym] = stats(by(r1, lambda x: x["symbol"] == sym))
-        print(line(sym, per_sym[sym], stats(by(r2, lambda x: x["symbol"] == sym))))
+        print(line(sym, stats(by(r1, lambda x: x["symbol"] == sym)), stats(by(r2, lambda x: x["symbol"] == sym))))
     pool, pool2 = stats(r1), stats(r2)
     print(line("GỘP", pool, pool2))
     print("\n  Theo chiều:")
@@ -277,22 +273,6 @@ def main():
         rr = [x["r"] for x in r1 if x["status"] == stt]
         if rr:
             print(f"    {stt:<8} {len(rr):>4} lệnh  E[R] {np.mean(rr):+.4f}")
-
-    need, section = GROUPS.get(tuple(args.symbols), (None, None))
-    if need:
-        big = [y for y in years if year_st[y]["n"] >= 20]
-        pos_years = sum(year_st[y]["er"] > 0 for y in big)
-        pos_sym, n_sym = sum(per_sym[s]["er"] > 0 for s in per_sym), len(per_sym)
-        crit = [("E[R] gộp > 0 ở ×1 và ×2", pool["er"] > 0 and pool2["er"] > 0),
-                ("CI95 gộp cận dưới > 0", pool["lo"] > 0),
-                (f"E[R] > 0 trên ≥ {need}/{n_sym} mã ({pos_sym}/{n_sym})", pos_sym >= need),
-                ("E[R] gộp > 0 ở cả MUA và BÁN", side_st["BUY"]["er"] > 0 and side_st["SELL"]["er"] > 0),
-                (f"E[R] > 0 ở ≥ 2/3 số năm có ≥ 20 lệnh ({pos_years}/{len(big)})",
-                 len(big) > 0 and pos_years * 3 >= 2 * len(big))]
-        print(f"\n  Tiêu chí (RULES.md mục {section}):")
-        for lab, ok in crit:
-            print(f"    {'✓' if ok else '✗'} {lab}")
-        print(f"  → {'ĐẠT (ứng viên, cần Demo)' if all(ok for _, ok in crit) else 'KHÔNG ĐẠT'}")
 
     account_tables(r1, args.account, args.risk_percent)
 
