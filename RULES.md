@@ -86,7 +86,35 @@ Ghi 2026-10-17, TRƯỚC khi viết code và chạy. Người dùng yêu cầu s
   mỗi mã, chi phí (spread + 5 point), cùng 5 mã và dữ liệu, 30 ngày đầu khởi động.
 - Cùng 5 tiêu chí ở mục 4, chạy đúng một lần. Không đạt → không tinh chỉnh tiếp trên dữ liệu này.
 
-## 6. Sổ chạy
+## 6. Lần chạy 3 — kiểm tra NGOÀI MẪU trên chỉ số Mỹ (US30, US100, US500)
+
+Ghi 2026-10-17, TRƯỚC khi viết code và chạy. Người dùng yêu cầu.
+
+- **Vì sao là ngoài mẫu:** dữ liệu 3 chỉ số chưa từng dùng cho CRT + TBS (lần chạy 1–2 chỉ dùng XAU + 4 FX). Quy tắc
+  D → H1 giữ **nguyên như mục 2–3** (commit b76d187 + 7b2af94 / 1330ff7 chỉ thêm báo cáo), không chỉnh tham số nào.
+  Lưu ý: tài liệu AR không nhắc tới chỉ số (chỉ ghi 6 cặp FX chính và "sub pairs" không định nghĩa) → đây là kiểm
+  quy tắc trên thị trường khác, không phải kiểm đúng phạm vi tài liệu.
+- Dữ liệu (BCR-MT5, mã sàn `#US30` / `#US100` / `#US500`, sha256 trong `<SYMBOL>_meta.json`): `data_2020`
+  (2019-10 → 2021-12) + `data_2022` (2021-10 → 2025-10-16), nối như mục 3 (trùng giờ giữ bản `data_2020`); 30 ngày
+  đầu khởi động. point 0,1 (như config repo cũ). Dữ liệu này đã dùng cho nghiên cứu S2-4 (MS-1, IDX-1) — không ảnh
+  hưởng tính ngoài mẫu với CRT + TBS vì quy tắc không chọn dựa trên nó.
+- **Spread (quy tắc của IDX-1, chốt trước):** với từng thư mục dữ liệu, trung vị spread M1 trong 06–16 UTC; nếu **= 0
+  hoặc > 2 × spread tham chiếu** (US30 30, US100 18, US500 10 point) → thay cả cột spread của thư mục đó bằng tham chiếu.
+  Biết trước: US100 / US500 trong `data_2020` có spread = 0 (sẽ bị thay).
+- Chi phí, mô phỏng, quản lý lệnh, một lệnh mở mỗi mã: như mục 3.
+
+**Tiêu chí đạt (phải đủ TẤT CẢ, cùng khuôn mục 4):**
+1. E[R] gộp 3 chỉ số > 0 ở chi phí ×1 VÀ ×2.
+2. CI95 bootstrap của E[R] gộp (×1) có cận dưới > 0.
+3. E[R] > 0 trên CẢ 3 chỉ số (×1).
+4. E[R] gộp > 0 ở cả lệnh MUA VÀ lệnh BÁN (×1).
+5. E[R] gộp > 0 ở ≥ 2/3 số năm (theo năm khớp lệnh) có ≥ 20 lệnh (×1).
+
+Ghi nhận trước: 3 chỉ số Mỹ đi rất sát nhau → lệnh trùng ngày, tương quan cao; CI95 bootstrap theo lệnh vì vậy hẹp hơn
+thực tế (tiêu chí 2 dễ đạt hơn đáng có). Chạy đúng một lần. Không đạt → không tinh chỉnh trên dữ liệu này.
+Đạt → vẫn chỉ là ứng viên trên chỉ số: cần Demo trước khi dùng tiền thật.
+
+## 7. Sổ chạy
 
 | # | Ngày | Commit | Kết quả | Quyết định |
 |---|---|---|---|---|
