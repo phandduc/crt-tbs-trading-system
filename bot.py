@@ -45,7 +45,8 @@ load_env()
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 MT5_LOGIN, MT5_PASSWORD, MT5_SERVER = (os.environ.get(k, "") for k in ("MT5_LOGIN", "MT5_PASSWORD", "MT5_SERVER"))
-SYMBOLS = [s.strip() for s in os.environ.get("SYMBOLS", "EURUSD,GBPUSD,AUDUSD,NZDUSD,XAUUSD").split(",") if s.strip()]
+SYMBOLS = [s.strip() for s in os.environ.get("SYMBOLS", "EURUSD.s,GBPUSD.s,AUDUSD.s,NZDUSD.s,XAUUSD.s").split(",")
+           if s.strip()]                         # mặc định: tên mã trên BCR-MT5 (kiểm 2026-10-17)
 AUTO_TRADE = os.environ.get("AUTO_TRADE", "false").strip().lower() == "true"
 ALLOW_REAL_ACCOUNT = os.environ.get("ALLOW_REAL_ACCOUNT", "false").strip().lower() == "true"
 try:
