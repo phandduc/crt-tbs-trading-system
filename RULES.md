@@ -72,3 +72,4 @@ Chạy đúng một lần. **Không đạt → không tinh chỉnh tham số tr�
 
 | # | Ngày | Commit | Kết quả | Quyết định |
 |---|---|---|---|---|
+| 1 | 2026-10-17 | b76d187, `python backtest.py` (log `run1.log`) | 311 lệnh (~1,5 lệnh/tháng/mã), win 35,7%, **E[R] gộp +0,064 (CI95 −0,15…+0,29), chi phí ×2 −0,050**; MUA −0,02 / BÁN +0,13; mã dương 4/5 (NZD −0,18); năm dương 3/7; max DD 24,5R. Lệnh SL trung bình −1,13R → chi phí ≈ 13% rủi ro (SL theo đỉnh vùng quét H1 khá hẹp). Leak test XAUUSD đạt (97 tín hiệu) | **KHÔNG ĐẠT** (tiêu chí 1, 2, 4, 5). Không tinh chỉnh trên dữ liệu này |
