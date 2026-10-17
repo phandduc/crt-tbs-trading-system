@@ -20,6 +20,7 @@ Quy tắc, tiêu chí và sổ chạy: **[RULES.md](RULES.md)** — đọc trư�
 | `crt_tbs.py` | Chiến lược: dựng nến D từ H1, key level, quét TBS / Model #1 → tín hiệu (dùng chung backtest + bot) |
 | `backtest.py` | Backtest trên CSV của repo cũ (kiểm sha256), mô phỏng M1, thống kê + tiêu chí + bảng balance năm / tháng. `--risk-percent` / `--account` chỉ đổi bảng USD (rủi ro cố định theo vốn ban đầu, không tái đầu tư); số liệu theo R không đổi |
 | `run_backtest.bat` | Menu chạy backtest: chọn mã, % rủi ro, vốn |
+| `export_data.py` | Xuất nến H1 + M1 từ MT5 (chỉ đọc) ra CSV + `<NAME>_meta.json` (sha256), kiểm M1 gộp H1 |
 | `bot.py` | Bot live MT5, một tiến trình cho mọi mã; Telegram |
 | `test_crt_tbs.py` | Test chiến lược / mô phỏng; `--leak` chống nhìn trước tương lai; `--window` cửa sổ nến live |
 | `test_bot.py` | Smoke test bot với MT5 giả |

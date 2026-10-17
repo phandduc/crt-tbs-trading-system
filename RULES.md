@@ -117,7 +117,12 @@ Ghi nhận trước: 3 chỉ số Mỹ đi rất sát nhau → lệnh trùng ng�
 thực tế (tiêu chí 2 dễ đạt hơn đáng có). Chạy đúng một lần. Không đạt → không tinh chỉnh trên dữ liệu này.
 Đạt → vẫn chỉ là ứng viên trên chỉ số: cần Demo trước khi dùng tiền thật.
 
-## 7. Lần chạy 4 — kiểm tra NGOÀI MẪU trên crypto (BTC, ETH)
+## 7. Lần chạy 4 — kiểm tra NGOÀI MẪU trên crypto (BTC, ETH) — ĐÃ XOÁ KHỎI CODE
+
+> 2026-10-17, người dùng yêu cầu: xoá nhánh crypto (nến D UTC trong `crt_tbs.py`, BTCUSD / ETHUSD + điền spread trong
+> backtest, test UTC, lựa chọn 6 của `run_backtest.bat`, `run4.log`, thư mục `data_crypto/`). Giữ `export_data.py`
+> (công cụ xuất chung). Mục này và dòng 4 của sổ chạy giữ làm lịch sử. Khôi phục code: commit 56edbb6
+> (dữ liệu: chạy lại `export_data.py`; sha256 cũ trong commit fc87396).
 
 Ghi 2026-10-17, sau khi xuất và xem dữ liệu (spread, giờ giao dịch), TRƯỚC khi chạy chiến lược trên dữ liệu này.
 Người dùng yêu cầu; người dùng chọn nến D crypto đóng **00:00 UTC** (chuẩn TradingView / sàn crypto).

@@ -2,7 +2,7 @@
 test_crt_tbs.py — Kiểm logic CRT + TBS bằng dữ liệu tự dựng + kiểm chống rò rỉ tương lai trên dữ liệu thật.
 
     python test_crt_tbs.py            # test nhanh (vài giây)
-    python test_crt_tbs.py --leak [SYMBOL]   # thêm: mọi tín hiệu (mặc định XAUUSD) vẫn xuất hiện khi cắt H1 tại lúc phát
+    python test_crt_tbs.py --leak     # thêm: mọi tín hiệu XAUUSD vẫn xuất hiện khi cắt H1 tại lúc phát tín hiệu
     python test_crt_tbs.py --window [N]   # thêm: N nến H1 gần nhất (mặc định 30 000, như bot live tối thiểu)
                                           # ra cùng tín hiệu như lịch sử đầy đủ
 """
@@ -26,7 +26,7 @@ def day_bars(o, h, l, c):
     return bars
 
 
-def synthetic_h1(flip: bool = False, start: pd.Timestamp = START) -> pd.DataFrame:
+def synthetic_h1(flip: bool = False) -> pd.DataFrame:
     days = [(95, 100, 90, 95), (95, 101, 91, 96), (96, 110, 95, 100),     # ngày 2: đỉnh swing 110
             (100, 105, 96, 100), (100, 104, 97, 98),                    # ngày 3, 4 xác nhận swing
             (98, 112, 97.5, 111.5)]                                     # ngày 5: nến CRT dày, chạm 110
@@ -40,7 +40,7 @@ def synthetic_h1(flip: bool = False, start: pd.Timestamp = START) -> pd.DataFram
     df = pd.DataFrame(bars, columns=["open", "high", "low", "close"])
     if flip:
         df = pd.DataFrame({"open": -df["open"], "high": -df["low"], "low": -df["high"], "close": -df["close"]})
-    df.insert(0, "time", start + pd.to_timedelta(np.arange(len(df)), unit="h"))
+    df.insert(0, "time", START + pd.to_timedelta(np.arange(len(df)), unit="h"))
     return df
 
 
@@ -49,20 +49,14 @@ def test_trading_day():
                                  utc=True))
     got = [x.strftime("%m-%d") for x in crt_tbs.trading_day(t)]
     assert got == ["01-10", "01-11", "07-10", "07-11"], got
-    # crypto (ngày UTC): Chủ nhật từ 17:00 New York (22:00 UTC mùa đông / 21:00 UTC mùa hè) → thứ Hai
-    t = pd.Series(pd.to_datetime(["2024-01-14 21:00", "2024-01-14 22:00", "2024-07-14 20:00", "2024-07-14 21:00",
-                                  "2024-01-13 23:00", "2024-01-15 00:00"], utc=True))
-    got = [x.strftime("%m-%d") for x in crt_tbs.trading_day(t, utc_day=True)]
-    assert got == ["01-14", "01-15", "07-14", "07-15", "01-13", "01-15"], got
 
 
-def test_signal(flip: bool, utc_day: bool = False):
-    start = pd.Timestamp("2024-01-08 00:00", tz="UTC") if utc_day else START    # đầu ngày giao dịch
-    orders = crt_tbs.find_orders(synthetic_h1(flip, start), utc_day=utc_day)
+def test_signal(flip: bool):
+    orders = crt_tbs.find_orders(synthetic_h1(flip))
     assert len(orders) == 1, orders
     o, s = orders[0], -1 if flip else 1
     assert o["side"] == ("BUY" if flip else "SELL"), o
-    assert o["created_ns"] == (start + pd.Timedelta(hours=6 * 24 + 5)).value, o
+    assert o["created_ns"] == (START + pd.Timedelta(hours=6 * 24 + 5)).value, o
     assert (o["sl"], o["tp1"], o["tp2"]) == (s * 113.5, s * 104.75, s * 97.5), o
 
 
@@ -99,11 +93,10 @@ def test_simulate():
 def test_leak(symbol: str = "XAUUSD"):
     """Cắt H1 tại lúc phát tín hiệu (bỏ mọi nến đóng sau đó) → tín hiệu phải giống hệt."""
     h1, _ = backtest.load(symbol, backtest.OLD_REPO)
-    utc = symbol in backtest.UTC_DAY
-    orders = crt_tbs.find_orders(h1, utc_day=utc)
+    orders = crt_tbs.find_orders(h1)
     close_ns = crt_tbs.ns(h1["time"]) + crt_tbs.NS_HOUR
     for o in orders:
-        cut = crt_tbs.find_orders(h1[close_ns <= o["created_ns"]], utc_day=utc)
+        cut = crt_tbs.find_orders(h1[close_ns <= o["created_ns"]])
         assert cut and cut[-1] == o, (o, cut[-1:] if cut else None)
     print(f"  leak test {symbol}: {len(orders)} tín hiệu, 0 khác biệt")
 
@@ -129,15 +122,13 @@ def test_window(n: int, symbol: str, years: int = 2, random_bars: int = 300):
 
 if __name__ == "__main__":
     test_trading_day()
-    for utc in (False, True):
-        test_signal(flip=False, utc_day=utc)
-        test_signal(flip=True, utc_day=utc)
+    test_signal(flip=False)
+    test_signal(flip=True)
     test_no_signal_without_key_level()
     test_simulate()
     print("  test nhanh: đạt")
     if "--leak" in sys.argv:
-        i = sys.argv.index("--leak")
-        test_leak(sys.argv[i + 1].upper() if i + 1 < len(sys.argv) and not sys.argv[i + 1].startswith("-") else "XAUUSD")
+        test_leak()
     if "--window" in sys.argv:
         i = sys.argv.index("--window")
         n = int(sys.argv[i + 1]) if i + 1 < len(sys.argv) else 30_000

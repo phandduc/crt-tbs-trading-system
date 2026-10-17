@@ -22,20 +22,15 @@ def ns(times) -> np.ndarray:
     return idx.as_unit("ns").asi8
 
 
-def trading_day(times: pd.Series, utc_day: bool = False) -> pd.Series:
-    """Ngày giao dịch của nến D. Mặc định chuẩn FX: đóng lúc 17:00 New York → giờ NY + 7 giờ rồi lấy ngày.
-    utc_day (crypto, RULES.md mục 7): ngày UTC, riêng nến từ 17:00 New York Chủ nhật (sàn mở tuần) tính vào thứ Hai."""
+def trading_day(times: pd.Series) -> pd.Series:
+    """Ngày giao dịch của nến D chuẩn FX: đóng lúc 17:00 New York → giờ NY + 7 giờ rồi lấy ngày."""
     ny = times.dt.tz_convert("America/New_York").dt.tz_localize(None)
-    if not utc_day:
-        return (ny + pd.Timedelta(hours=7)).dt.normalize()
-    day = times.dt.tz_convert("UTC").dt.tz_localize(None).dt.normalize()
-    week_open = (day.dt.dayofweek == 6) & (ny.dt.dayofweek == 6) & (ny.dt.hour >= 17)
-    return day + pd.to_timedelta(week_open.astype(int), unit="D")
+    return (ny + pd.Timedelta(hours=7)).dt.normalize()
 
 
-def daily(h1: pd.DataFrame, utc_day: bool = False) -> pd.DataFrame:
+def daily(h1: pd.DataFrame) -> pd.DataFrame:
     """Nến D từ H1 (h1 đã sắp theo thời gian): open/high/low/close + first/last = chỉ số nến H1 đầu / cuối của ngày."""
-    g = h1.assign(day=trading_day(h1["time"], utc_day).to_numpy(), idx=np.arange(len(h1))).groupby("day", sort=True)
+    g = h1.assign(day=trading_day(h1["time"]).to_numpy(), idx=np.arange(len(h1))).groupby("day", sort=True)
     return g.agg(open=("open", "first"), high=("high", "max"), low=("low", "min"), close=("close", "last"),
                  first=("idx", "first"), last=("idx", "last")).reset_index()
 
@@ -78,11 +73,10 @@ def scan_candle2(O, H, C, i0: int, i1: int, crth: float):
     return None
 
 
-def find_orders(h1: pd.DataFrame, from_ns: int = 0, utc_day: bool = False) -> list:
-    """Mọi tín hiệu CRT + TBS trên h1 (cột time UTC, open, high, low, close), created_ns ≥ from_ns, theo thời gian.
-    utc_day: nến D theo ngày UTC (crypto) thay vì đóng 17:00 New York."""
+def find_orders(h1: pd.DataFrame, from_ns: int = 0) -> list:
+    """Mọi tín hiệu CRT + TBS trên h1 (cột time UTC, open, high, low, close), created_ns ≥ from_ns, theo thời gian."""
     h1 = h1.sort_values("time").reset_index(drop=True)
-    d = daily(h1, utc_day)
+    d = daily(h1)
     T = ns(h1["time"])
     O, H, L, C = (h1[k].to_numpy(float) for k in ("open", "high", "low", "close"))
     do, dh, dl, dc = (d[k].to_numpy(float) for k in ("open", "high", "low", "close"))
