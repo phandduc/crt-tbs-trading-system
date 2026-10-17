@@ -169,12 +169,80 @@ def line(label: str, st: dict, st2: dict = None) -> str:
     return s + (f"  | ×2 {st2['er']:+.4f}" if st2 else "")
 
 
+def print_box(headers: list, rows: list, aligns: str, total: list = None):
+    """In bảng kẻ khung. aligns: mỗi cột 'l' hoặc 'r'. total: dòng tổng (ngăn bằng vạch kẻ)."""
+    data = [headers] + rows + ([total] if total else [])
+    w = [max(len(str(r[i])) for r in data) for i in range(len(headers))]
+    cell = lambda v, i, al: f" {str(v):<{w[i]}} " if al == "l" else f" {str(v):>{w[i]}} "
+    rule = lambda l, m, r: l + m.join("─" * (x + 2) for x in w) + r
+    out = [rule("┌", "┬", "┐"), "│" + "│".join(cell(h, i, "l") for i, h in enumerate(headers)) + "│",
+           rule("├", "┼", "┤")]
+    out += ["│" + "│".join(cell(v, i, aligns[i]) for i, v in enumerate(r)) + "│" for r in rows]
+    if total:
+        out += [rule("├", "┼", "┤"), "│" + "│".join(cell(v, i, aligns[i]) for i, v in enumerate(total)) + "│"]
+    out.append(rule("└", "┴", "┘"))
+    print("\n".join("  " + x for x in out))
+
+
+def account_tables(results: list, account: float, risk_pct: float):
+    """
+    Một tài khoản chung cho mọi mã, rủi ro cố định account × risk_pct mỗi lệnh (không tái đầu tư, không làm tròn lot).
+    Balance = vốn + lãi/lỗ đã chốt (lệnh tính vào kỳ ĐÓNG lệnh). In tóm tắt + bảng theo năm + theo tháng (đủ mọi tháng).
+    DD tích lũy = balance cuối kỳ dưới vốn ban đầu (%); dòng TỔNG = balance thấp nhất dưới vốn ban đầu.
+    """
+    closed = sorted([x for x in results if x["status"] in CLOSED], key=lambda x: x["exit_ns"])
+    if not closed:
+        return
+    risk_usd = account * risk_pct / 100
+    bal = account + np.cumsum([x["r"] * risk_usd for x in closed])
+    peak = np.maximum.accumulate(np.concatenate([[account], bal]))[1:]
+    i = int(np.argmax(peak - bal))
+    live, mx = [], 0
+    for x in sorted(closed, key=lambda x: x["fill_ns"]):
+        live = [e for e in live if e > x["fill_ns"]] + [x["exit_ns"]]
+        mx = max(mx, len(live))
+    print(f"\n  Tài khoản chung mọi mã: vốn {account:,.0f} USD, rủi ro {risk_pct:g}% = {risk_usd:,.0f} USD / lệnh")
+    print(f"  Balance đầu / cuối      : {account:,.0f} → {bal[-1]:,.0f} USD ({(bal[-1] - account) / account * 100:+.1f}%)")
+    print(f"  Max DD balance          : {peak[i] - bal[i]:,.0f} USD ({(peak[i] - bal[i]) / peak[i] * 100:.1f}% từ đỉnh)"
+          f" | balance thấp nhất {min(bal.min(), account):,.0f}")
+    print(f"  Lệnh mở cùng lúc lớn nhất: {mx}")
+    if bal.min() <= 0:
+        k = int(np.argmax(bal <= 0))
+        print(f"  ⚠ CHÁY TÀI KHOẢN: balance chạm 0 lúc {pd.Timestamp(closed[k]['exit_ns']):%Y-%m-%d} (lệnh thứ {k + 1}); "
+              f"số sau đó chỉ để so sánh")
+
+    cnt = lambda xs, s: sum(x["status"] == s for x in xs)
+    for title, fmt, freq in (("năm", "%Y", "Y"), ("tháng", "%Y-%m", "M")):
+        key = lambda x: pd.Timestamp(x["exit_ns"]).strftime(fmt)
+        groups = {}
+        for x in closed:
+            groups.setdefault(key(x), []).append(x)
+        rows, b = [], account
+
+        def row(label, xs, b_end, dd):
+            r = np.array([x["r"] for x in xs])
+            return [label, len(xs), f"{(r > 0).mean() * 100:.1f}" if len(r) else "—",
+                    f"{cnt(xs, 'TP1_TP2')}/{cnt(xs, 'SL')}/{cnt(xs, 'TP1_BE')}", f"{r.sum():+.2f}",
+                    f"{r.sum() * risk_usd:+,.0f}", f"{b_end:,.0f}", f"{dd:.2f}%", f"{(b_end - account) / account * 100:+.2f}%"]
+
+        for p in pd.period_range(key(closed[0]), key(closed[-1]), freq=freq).strftime(fmt):
+            xs = groups.get(p, [])
+            b += sum(x["r"] for x in xs) * risk_usd
+            rows.append(row(p, xs, b, max(0.0, (account - b) / account * 100)))
+        print(f"\n  Theo {title} (TP/SL/BE = TP1 + TP2 / dừng lỗ / TP1 rồi hoà vốn):")
+        print_box([title.capitalize(), "Lệnh", "Win%", "TP/SL/BE", "PnL R", "PnL USD", "Balance", "DD tích lũy",
+                   "Tăng trưởng"], rows, "lrrrrrrrr",
+                  row("TỔNG", closed, bal[-1], max(0.0, (account - bal.min()) / account * 100)))
+
+
 def main():
     ap = argparse.ArgumentParser(description="Backtest CRT + TBS, không kết nối MT5")
     ap.add_argument("--tf", default="D-H1", choices=list(TIMEFRAMES), help="khung nến CRT → khung vào lệnh")
     ap.add_argument("--symbols", nargs="+", type=str.upper, default=list(DATASETS), choices=list(DATASETS))
     ap.add_argument("--root", type=Path, default=OLD_REPO, help="repo chứa các thư mục data*/ (mặc định repo S2-4 cũ)")
     ap.add_argument("--csv", default=None, help="ghi danh sách lệnh (chi phí ×1) ra CSV")
+    ap.add_argument("--account", type=float, default=10_000.0, help="vốn tài khoản chung (USD) cho bảng balance")
+    ap.add_argument("--risk-percent", type=float, default=1.0, help="%% vốn rủi ro mỗi lệnh cho bảng balance")
     args = ap.parse_args()
     htf_hours, ltf_minutes = TIMEFRAMES[args.tf]
 
@@ -233,6 +301,8 @@ def main():
         print(f"  → {'ĐẠT (ứng viên, cần Demo)' if all(ok for _, ok in crit) else 'KHÔNG ĐẠT'}")
         if args.tf != "D-H1":
             print("  ⚠ Kết quả TRONG MẪU — lần thử thứ 2 trên cùng dữ liệu (RULES.md mục 5)")
+
+    account_tables(r1, args.account, args.risk_percent)
 
     if args.csv:
         df = pd.DataFrame(r1)
